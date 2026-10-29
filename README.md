@@ -6,7 +6,7 @@ Built for structural engineers working with ETABS on Windows. Includes a local M
 
 **Windows x64 · ETABS 23 · Version 0.1.4 · MIT license**
 
-[**Download ZIP**](https://github.com/melkadygo-sudo/structlink-etabs/archive/refs/heads/main.zip) · [Setup guide](docs/SETUP.md) · [Test results](docs/VALIDATION.md) · [Report an issue](https://github.com/melkadygo-sudo/structlink-etabs/issues)
+[**Download ZIP**](https://github.com/melkadygo-sudo/structlink-etabs/releases/download/v0.1.4/StructLink-ETABS-v0.1.4-source-only.zip) · [Setup guide](docs/SETUP.md) · [Test results](docs/VALIDATION.md) · [Report an issue](https://github.com/melkadygo-sudo/structlink-etabs/issues)
 
 > Formerly ETABS Connector. Existing installations retain the `etabs23` server ID and original installation paths for compatibility.
 
@@ -27,7 +27,7 @@ Built for structural engineers working with ETABS on Windows. Includes a local M
 
 ### 1. Download and extract
 
-[**Download StructLink for ETABS**](https://github.com/melkadygo-sudo/structlink-etabs/archive/refs/heads/main.zip), then choose **Extract all**.
+[**Download StructLink for ETABS**](https://github.com/melkadygo-sudo/structlink-etabs/releases/download/v0.1.4/StructLink-ETABS-v0.1.4-source-only.zip), then choose **Extract all**.
 
 Before installing, you need:
 
@@ -97,7 +97,7 @@ Version 0.1.4 removes the allowed-folder restriction. Use any model folder acces
 
 ## What has been tested
 
-Version 0.1.3 passed installer and registration checks on the host and in a fresh Windows Sandbox session.
+Version 0.1.4 passed host installer and registration checks, plus path validation regression checks. Those path checks did not connect to ETABS or access an actual network share. The Windows Sandbox checks below apply to version 0.1.3 only; Sandbox was not rerun for version 0.1.4.
 
 | Check | Result |
 | --- | --- |
