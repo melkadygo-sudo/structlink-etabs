@@ -1,0 +1,83 @@
+name: Publish StructLink v0.1.4
+on:
+  push:
+    branches: [main]
+    paths: [.github/workflows/release-v0.1.4.yml]
+  workflow_dispatch:
+permissions:
+  contents: write
+concurrency:
+  group: structlink-release-v0.1.4
+  cancel-in-progress: false
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out the validated source commit
+        uses: actions/checkout@11bd71901bbe5b1630ceea73d27597364c9af683
+        with:
+          ref: c4ae398f55fb17d170129a4e5bd0a64c8faf93b0
+          persist-credentials: false
+      - name: Package and audit source only archive
+        shell: python
+        run: |
+          import hashlib, json, pathlib, re, subprocess, zipfile
+          files = json.loads("{\".codex-plugin/plugin.json\":\"9f6f36dd79aa002c0edf341dfa77fedc89dc6877\",\".gitignore\":\"dc4972f0a8e7bbdfabbc45cb10f40c540414e1ba\",\".mcp.json\":\"65b7ce4eb157237266f8a57e40c08e2c0346a28e\",\"INSTALL.cmd\":\"38005498aa3c13c0da5f6e6e4e5a88943913d0a3\",\"LICENSE\":\"01235ea471a654735ebfd69a3ced8eba78fa5ff7\",\"README.md\":\"6f91e9e28305df6a9c001ef11de0fa6a925624ee\",\"docs/SETUP.md\":\"ad0248482cc388ce77028c6164cde807dc658159\",\"docs/VALIDATION.md\":\"00bec876cbb7b6dc1846196d6eba238b1efe4ceb\",\"scripts/install-etabs-connector.cmd\":\"ffd0e2a94e62550be8e9109bb120332483ce3914\",\"scripts/install-etabs-connector.ps1\":\"9d73c8624660ca3ff22106e6d8083481f57d11fd\",\"scripts/setup.ps1\":\"22c8d1fbf84839763d5c12415452ba3ad6ddcb4c\",\"scripts/start-etabs-connector.ps1\":\"8427a7a3c1ccee97c403c6aa6b912a4a8e2c3ef2\",\"scripts/test-etabs-connector.cmd\":\"ec5aff5d565162a03c26af885a18e65e6e0d399a\",\"scripts/test-etabs-connector.ps1\":\"a0c106243dff062eaa27303886356154d3f8f92d\",\"skills/etabs-connector/SKILL.md\":\"17fcf3234e1d88028fe68be57b8c33ff4f6aa88e\",\"src/EtabsConnector/ConnectorException.cs\":\"48a0109cdab46a4d7b3bd6ba30b9c71578f65766\",\"src/EtabsConnector/ConnectorSettings.cs\":\"b9df7e02f9d2146049148e7e42930359d4188da4\",\"src/EtabsConnector/EtabsConnector.csproj\":\"72ceff32fb96848b2d13eeca166e176927f3eaea\",\"src/EtabsConnector/EtabsSession.cs\":\"622cb39b2ef2b8c07e995db7669018a7f89335a1\",\"src/EtabsConnector/EtabsUnits.cs\":\"dfde6c63b11f26b0b2c08369433ba99dfab0fd1e\",\"src/EtabsConnector/GenericApiGateway.cs\":\"83a0d7f2e7c1e09821e6cb2f92d1aaaf12d1ac67\",\"src/EtabsConnector/McpServer.cs\":\"30bcddabbbb43c5fe67920f91a11ee4c441befb4\",\"src/EtabsConnector/Program.cs\":\"50c2d41aedfe21fb7e43c8046fe86ab354a9d2af\",\"src/EtabsConnector/ToolCatalog.cs\":\"084c7f5bd2c98104de06211616ce307fbce00a2f\",\"tests/PathValidation/PathValidation.csproj\":\"c28d9249b7bc276c7f90332fcc2308434cdc0255\",\"tests/PathValidation/Program.cs\":\"a475f91f14cff74895e57ab5bc05e3d320752b32\",\"tests/mcp-smoke.ndjson\":\"dcfe83474665969ea95b88e48b00dc7b2a5113de\",\"tests/test-installation.ps1\":\"5796b6231781fab8265a7de98407b4c35b59c669\"}")
+          out = pathlib.Path("release-assets")
+          out.mkdir()
+          root = "StructLink-ETABS-v0.1.4"
+          archive = out / (root + "-source-only.zip")
+          banned_parts = {".git", "bin", "obj", "dist", "runtime", "node_modules", "__pycache__", ".vs"}
+          allowed_ext = {".cs", ".csproj", ".json", ".md", ".ps1", ".cmd", ".ndjson"}
+          patterns = [
+              rb"-----BEGIN (?:RSA |EC |OPENSSH )?PRIVATE KEY-----",
+              rb"(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|AKIA[A-Z0-9]{16}|sk-(?:proj-)?[A-Za-z0-9_-]{24,})",
+              rb"(?i)[A-Z]:[\\/]+Users[\\/]+[^\\/\s]+",
+              rb"/(?:Users|home|workspace)/[A-Za-z0-9_]"
+          ]
+          with zipfile.ZipFile(archive, "w", compression=zipfile.ZIP_DEFLATED, compresslevel=9) as z:
+              for name, expected in sorted(files.items()):
+                  p = pathlib.PurePosixPath(name)
+                  assert not p.is_absolute() and ".." not in p.parts and not banned_parts.intersection(p.parts), name
+                  assert p.suffix in allowed_ext or name in {"LICENSE", ".gitignore"}, name
+                  assert subprocess.check_output(["git", "ls-files", "-s", "--", name]).startswith(b"100644 "), name
+                  data = subprocess.check_output(["git", "show", "HEAD:" + name])
+                  actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
+                  assert actual == expected, name
+                  data.decode("utf-8")
+                  assert not data.startswith((b"MZ", b"PK\x03\x04", b"\x7fELF")), name
+                  assert not any(re.search(pattern, data) for pattern in patterns), "Sensitive pattern: " + name
+                  info = zipfile.ZipInfo(root + "/" + name, date_time=(2026,10,20,19,50,46))
+                  info.external_attr = 0o100644 << 16
+                  info.compress_type = zipfile.ZIP_DEFLATED
+                  z.writestr(info, data)
+          with zipfile.ZipFile(archive) as z:
+              assert z.testzip() is None
+              assert len(z.infolist()) == 28
+              for name, expected in files.items():
+                  data = z.read(root + "/" + name)
+                  assert hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest() == expected
+          assert json.loads(subprocess.check_output(["git","show","HEAD:.codex-plugin/plugin.json"]))["version"] == "0.1.4"
+          (out / "SHA256SUMS.txt").write_text(hashlib.sha256(archive.read_bytes()).hexdigest() + "  " + archive.name + "\n")
+          pathlib.Path("release-notes.md").write_text("StructLink for ETABS v0.1.4 is the first versioned public release of the local MCP connector for Codex and ETABS 23.\n\n### Changes\n* Removes the model folder restriction. Legacy allowed root settings are ignored.\n* Retains separate write and analysis permissions. New installations start with both disabled.\n* Preserves existing settings, skills and conflicting Codex registrations.\n\n### Download and requirements\nDownload **StructLink-ETABS-v0.1.4-source-only.zip** under Assets. This is source with the guided installer, not a compiled application. CSI assemblies, ETABS, licences, credentials, private models, personal machine paths and build outputs are not included. Generic installation paths and synthetic test paths remain in the source and documentation.\n\nRequires Windows x64, a licensed local ETABS 23 installation, internet access for dependency downloads and restore, and Codex or another client supporting local stdio MCP servers. Automatic Codex registration requires its CLI on PATH. The installer handles the .NET 8 SDK when missing.\n\n### Installation\n1. Download the named ZIP and use **Extract all**.\n2. Open the extracted folder and double click **INSTALL.cmd**. Follow the dependency prompts.\n3. Restart Codex, open a disposable model in ETABS 23, and request inspection without changes. Compare the response with ETABS.\n4. If setup reports a conflicting registration or unavailable Codex CLI, follow its manual registration guidance.\n\nExisting users can rerun INSTALL.cmd and restart Codex. Existing settings and skills are preserved. Enable writes and analysis separately only when required. See [Setup](https://github.com/melkadygo-sudo/structlink-etabs/blob/v0.1.4/docs/SETUP.md).\n\n### Validation and limitations\n**Recorded for v0.1.4:** host installer checks passed, covering fresh build, Codex registration and exact registered command launch, skill installation, read only defaults, repeat installation and conflicting registration preservation. Separate path regression checks passed for arbitrary drives, synthetic UNC paths, ignored legacy roots and invalid model paths. Those path tests did not connect to ETABS or access a real network share.\n\n**Recorded for v0.1.3 only:** Windows Sandbox dependency download and checksum verification, build, MCP startup and registration checks. Sandbox was not rerun for v0.1.4. ETABS files and Codex CLI were supplied from the host.\n\nThese checks do not demonstrate live ETABS COM attachment, model editing, result retrieval or structural analysis. Fresh ETABS/Codex desktop installation, ETABS activation in Sandbox, the WinGet/UAC/reboot branch and the custom ETABS file picker remain untested. Not every discoverable API method has been tested. No new ETABS integration validation is claimed for this release.\n\nSee the [validation record](https://github.com/melkadygo-sudo/structlink-etabs/blob/v0.1.4/docs/VALIDATION.md). Review engineering outputs independently.\n\n### Provenance and integrity\nSource commit: `c4ae398f55fb17d170129a4e5bd0a64c8faf93b0`.\nThe named ZIP contains the 28 source files from that commit, with original bytes and a single root folder. SHA256SUMS.txt records its SHA256 checksum. Packaging verifies file types, Git blob hashes, archive integrity, and scans for common credential and personal path patterns; this is not a certification of the software.\n\nMIT licensed connector source. Independent project, with no affiliation or endorsement by CSI or OpenAI. Licensed CSI binaries must not be redistributed.\n")
+          print("PASS: 28 source files, exact Git blob hashes, archive integrity and distribution audit.")
+          print((out / "SHA256SUMS.txt").read_text())
+          
+      - name: Create draft, verify uploaded assets, then publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: melkadygo-sudo/structlink-etabs
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view v0.1.4 >/dev/null 2>&1; then
+            echo "Release already exists; refusing to overwrite it."
+            exit 1
+          fi
+          gh release create v0.1.4 --target c4ae398f55fb17d170129a4e5bd0a64c8faf93b0 --title "StructLink for ETABS v0.1.4" --notes-file release-notes.md --draft release-assets/*
+          mkdir downloaded
+          gh release download v0.1.4 --dir downloaded
+          (cd downloaded && sha256sum --check SHA256SUMS.txt)
+          cmp release-assets/SHA256SUMS.txt downloaded/SHA256SUMS.txt
+          gh release edit v0.1.4 --draft=false --latest
+          gh release view v0.1.4 --json url,tagName,isDraft,isPrerelease,assets
