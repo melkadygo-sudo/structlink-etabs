@@ -71,8 +71,8 @@ jobs:
         run: |
           set -euo pipefail
           if gh release view v0.1.4 >/dev/null 2>&1; then
-            echo "Release already exists; refusing to overwrite it."
-            exit 1
+            echo "Release already exists; preserving it and verifying public downloads."
+            exit 0
           fi
           gh release create v0.1.4 --target c4ae398f55fb17d170129a4e5bd0a64c8faf93b0 --title "StructLink for ETABS v0.1.4" --notes-file release-notes.md --draft release-assets/*
           mkdir downloaded
@@ -81,3 +81,13 @@ jobs:
           cmp release-assets/SHA256SUMS.txt downloaded/SHA256SUMS.txt
           gh release edit v0.1.4 --draft=false --latest
           gh release view v0.1.4 --json url,tagName,isDraft,isPrerelease,assets
+      - name: Verify public download without credentials
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p public-download
+          curl --fail --location --retry 3 --output public-download/StructLink-ETABS-v0.1.4-source-only.zip https://github.com/melkadygo-sudo/structlink-etabs/releases/download/v0.1.4/StructLink-ETABS-v0.1.4-source-only.zip
+          curl --fail --location --retry 3 --output public-download/SHA256SUMS.txt https://github.com/melkadygo-sudo/structlink-etabs/releases/download/v0.1.4/SHA256SUMS.txt
+          cmp release-assets/SHA256SUMS.txt public-download/SHA256SUMS.txt
+          (cd public-download && sha256sum --check SHA256SUMS.txt)
+          unzip -t public-download/StructLink-ETABS-v0.1.4-source-only.zip
